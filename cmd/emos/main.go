@@ -62,7 +62,18 @@ func printResult(e *emos.Emoji) {
 		b.WriteString(e.Image)
 	}
 
-	fmt.Printf("%s\n", b.String())
+	if !isStdoutPiped() {
+		b.WriteByte('\n')
+	}
+	fmt.Printf("%s", b.String())
+}
+
+func isStdoutPiped() bool {
+	info, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice == 0
 }
 
 func configFile(name string) string {
