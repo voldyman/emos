@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/voldyman/emos"
@@ -13,7 +14,7 @@ func main() {
 	if len(os.Args) > 1 {
 		text = strings.Join(os.Args[1:], " ")
 	}
-	emos, err := emos.NewEmojiSearch("emojicache.json", "index.bleve")
+	emos, err := emos.NewEmojiSearch(configFile("emojicache.json"), configFile("index.bleve"))
 	if err != nil {
 		panic(err)
 	}
@@ -29,4 +30,18 @@ func main() {
 	for _, e := range result.Emojis {
 		fmt.Printf("Title: %s, Image: %s\n", e.Title, e.Image)
 	}
+}
+
+func configFile(name string) string {
+	return filepath.Join(emosDir(), name)
+}
+
+func emosDir() string {
+	cfg, err := os.UserConfigDir()
+	if err != nil {
+		fmt.Println("failed to get config dir")
+		panic(err)
+	}
+
+	return filepath.Join(cfg, "emos")
 }
