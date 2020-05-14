@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,9 +10,20 @@ import (
 	"github.com/voldyman/emos"
 )
 
+var (
+	updateFlag   = flag.Bool("update", false, "update emoji list and index")
+	markdownFlag = flag.Bool("md", false, "print markdown formatted link")
+	onlyLinkFlag = flag.Bool("link", false, "only prints the link")
+	luckyFlag    = flag.Bool("lucky", false, "only prints the first result")
+)
+
+func init() {
+	flag.Parse()
+}
+
 func main() {
 	text := ""
-	if len(os.Args) > 1 {
+	if len(flag.Args()) > 0 {
 		text = strings.Join(os.Args[1:], " ")
 	}
 	emos, err := emos.NewEmojiSearch(configFile("emojicache.json"), configFile("index.bleve"))
@@ -20,16 +32,37 @@ func main() {
 	}
 	defer emos.Close()
 
-	if emos.IsIndexEmpty() {
+	if emos.IsIndexEmpty() || *updateFlag {
 		fmt.Println("building index, this will take a minute. you should hydrate. :blobsweat:")
 		emos.RefreshIndex()
 	}
 
 	result := emos.Search(text)
+	emojis := result.Emojis
 
-	for _, e := range result.Emojis {
-		fmt.Printf("Title: %s, Image: %s\n", e.Title, e.Image)
+	if *luckyFlag && len(emojis) > 1 {
+		emojis = emojis[0:1]
 	}
+	for _, e := range emojis {
+		printResult(e)
+	}
+}
+
+func printResult(e *emos.Emoji) {
+	var b strings.Builder
+	if !*onlyLinkFlag {
+		b.WriteString(e.Title)
+		b.WriteString(" - ")
+	}
+	if *markdownFlag {
+		b.WriteString("/md ![](")
+		b.WriteString(e.Image)
+		b.WriteString(")")
+	} else {
+		b.WriteString(e.Image)
+	}
+
+	fmt.Printf("%s\n", b.String())
 }
 
 func configFile(name string) string {
