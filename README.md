@@ -1,6 +1,6 @@
 #### emos - Emoji Search
 
-I wrote this program because emoji search on https://discordemojis.com is pretty slow and i want to be annoying in our work chat more often.
+I wrote this program because emoji search on https://discordemoji.com/ is pretty slow and i want to be annoying in our work chat more often.
 
 The CLI caches the emojis and builds an index to make it faster to search.
 
