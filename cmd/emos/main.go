@@ -43,12 +43,20 @@ func main() {
 	if *luckyFlag && len(emojis) > 1 {
 		emojis = emojis[0:1]
 	}
+
+	lines := []string{}
 	for _, e := range emojis {
-		printResult(e)
+		lines = append(lines, createPrintStatement(e))
+	}
+
+	if isStdoutPiped() {
+		fmt.Printf("%s", strings.Join(lines, "\n"))
+	} else {
+		fmt.Println(strings.Join(lines, "\n"))
 	}
 }
 
-func printResult(e *emos.Emoji) {
+func createPrintStatement(e *emos.Emoji) string {
 	var b strings.Builder
 	if !*onlyLinkFlag {
 		b.WriteString(e.Title)
@@ -61,11 +69,7 @@ func printResult(e *emos.Emoji) {
 	} else {
 		b.WriteString(e.Image)
 	}
-
-	if !isStdoutPiped() {
-		b.WriteByte('\n')
-	}
-	fmt.Printf("%s", b.String())
+	return b.String()
 }
 
 func isStdoutPiped() bool {
