@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/voldyman/emos"
+	"github.com/voldyman/emos/internal/config"
 )
 
 var (
@@ -15,6 +15,7 @@ var (
 	markdownFlag = flag.Bool("md", false, "print markdown formatted link")
 	onlyLinkFlag = flag.Bool("link", false, "only prints the link")
 	luckyFlag    = flag.Bool("lucky", false, "only prints the first result")
+	conigDirFlag = flag.Bool("cfg", false, "prints the config dir")
 )
 
 func init() {
@@ -26,7 +27,13 @@ func main() {
 	if len(flag.Args()) > 0 {
 		text = strings.Join(os.Args[1:], " ")
 	}
-	emos, err := emos.NewEmojiSearch(configFile("emojicache.json"), configFile("index.bleve"))
+
+	if *conigDirFlag {
+		fmt.Println(config.Dir())
+		return
+	}
+
+	emos, err := emos.NewEmojiSearch(config.Loc(config.CacheFileName), config.Loc(config.IndexFileName))
 	if err != nil {
 		panic(err)
 	}
@@ -78,18 +85,4 @@ func isStdoutPiped() bool {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice == 0
-}
-
-func configFile(name string) string {
-	return filepath.Join(emosDir(), name)
-}
-
-func emosDir() string {
-	cfg, err := os.UserConfigDir()
-	if err != nil {
-		fmt.Println("failed to get config dir")
-		panic(err)
-	}
-
-	return filepath.Join(cfg, "emos")
 }

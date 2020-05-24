@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+
+	"github.com/voldyman/emos/internal/config"
+)
+
+const (
+	writePerms = 0644
 )
 
 type Emoji struct {
@@ -17,8 +23,9 @@ type Emoji struct {
 }
 
 type EmojiSearch struct {
-	store map[string]*Emoji
-	index *index
+	emojiCacheLoc string
+	store         map[string]*Emoji
+	index         *index
 }
 
 func NewEmojiSearch(cacheLoc, indexLoc string) (*EmojiSearch, error) {
@@ -33,13 +40,14 @@ func NewEmojiSearch(cacheLoc, indexLoc string) (*EmojiSearch, error) {
 	}
 
 	return &EmojiSearch{
-		store: store,
-		index: idx,
+		emojiCacheLoc: cacheLoc,
+		store:         store,
+		index:         idx,
 	}, nil
 }
 
-func (f *EmojiSearch) IsIndexEmpty() bool {
-	return f.index.Count() == 0
+func (es *EmojiSearch) IsIndexEmpty() bool {
+	return es.index.Count() == 0
 }
 
 type SearchResult struct {
@@ -66,49 +74,79 @@ func (es *EmojiSearch) Search(input string) *SearchResult {
 	return result
 }
 
+// Close closes the search
 func (es *EmojiSearch) Close() {
 	es.index.Close()
 }
 
+// RefreshIndex updates the index
 func (es *EmojiSearch) RefreshIndex() {
 	es.index.IndexEmojiStore(es.store)
+}
+
+// UpdateEmojis refreshes the local cache of emojis
+func (es *EmojiSearch) UpdateEmojis() error {
+	f, err := ioutil.TempFile("", "temp-emoji")
+	if err != nil {
+		return fmt.Errorf("unable to create temp file for caching emojis: %w", err)
+	}
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+
+	_, err = updateEmojis(f.Name())
+	if err != nil {
+		return fmt.Errorf("unable to fetch new emojis: %w", err)
+	}
+
+	return os.Rename(f.Name(), config.Loc(config.CacheFileName))
 }
 
 func getEmojis(cacheLoc string) (map[string]*Emoji, error) {
 	_, err := os.Stat(cacheLoc)
 
 	if err == nil {
-		f, err := ioutil.ReadFile(cacheLoc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read cache: %w", err)
+		if emojis, err := readEmojis(cacheLoc); err == nil {
+			return emojis, nil
 		}
-
-		result := map[string]*Emoji{}
-		err = json.Unmarshal(f, &result)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode cache: %w", err)
-		}
-
-		return result, nil
 	}
 
-	if os.IsNotExist(err) {
-		emojis, err := fetchEmojis()
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch emojis: %w", err)
-		}
-
-		d, err := json.Marshal(emojis)
-		if err == nil {
-			ioutil.WriteFile(cacheLoc, d, 0644)
-		} else {
-			fmt.Println("unable to cache emojis, ignoring")
-		}
-		return emojis, nil
-	}
-
-	return nil, fmt.Errorf("failed to stat cache file: %w", err)
+	return updateEmojis(cacheLoc)
 }
+
+func readEmojis(cacheLoc string) (map[string]*Emoji, error) {
+	f, err := ioutil.ReadFile(cacheLoc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cache: %w", err)
+	}
+
+	result := map[string]*Emoji{}
+	err = json.Unmarshal(f, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode cache: %w", err)
+	}
+
+	return result, nil
+
+}
+
+func updateEmojis(cacheLoc string) (map[string]*Emoji, error) {
+	emojis, err := fetchEmojis()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch emojis: %w", err)
+	}
+
+	d, err := json.Marshal(emojis)
+	if err == nil {
+		ioutil.WriteFile(cacheLoc, d, writePerms)
+	} else {
+		fmt.Println("unable to cache emojis, ignoring")
+	}
+
+	return emojis, nil
+}
+
 func getIndex(indexLoc string) (*index, error) {
 	_, err := os.Stat(indexLoc)
 
