@@ -74,16 +74,20 @@ type alfredResult struct {
 type alfredItem struct {
 	Title        string `json:"title"`
 	QuickLookURL string `json:"quicklookurl"`
-	Icon         struct {
+	Text         struct {
+		Copy string `json:"copy"`
+	} `json:"text"`
+	Icon struct {
 		Type string `json:"type"`
 		Path string `json:"path"`
 	} `json:"icon"`
 }
 
-func newAlfredItem(title, path string) *alfredItem {
+func newAlfredItem(title, url, path string) *alfredItem {
 	ai := new(alfredItem)
 	ai.Title = title
 	ai.QuickLookURL = path
+	ai.Text.Copy = url
 	ai.Icon.Type = "filepath"
 	ai.Icon.Path = path
 
@@ -126,7 +130,7 @@ func prepareResults(emojis []*emos.Emoji) <-chan *alfredItem {
 					return err
 				}
 				name := emoji.Title
-				aiChan <- newAlfredItem(name, imgPath)
+				aiChan <- newAlfredItem(name, emoji.Image, imgPath)
 			}
 			return nil
 		})
