@@ -72,7 +72,9 @@ type alfredResult struct {
 }
 
 type alfredItem struct {
+	UID          string `json:"uid"`
 	Title        string `json:"title"`
+	Arg          string `json:"arg"`
 	QuickLookURL string `json:"quicklookurl"`
 	Text         struct {
 		Copy string `json:"copy"`
@@ -81,15 +83,26 @@ type alfredItem struct {
 		Type string `json:"type"`
 		Path string `json:"path"`
 	} `json:"icon"`
+	Mods struct {
+		Alt struct {
+			Valid    bool   `json:"valid"`
+			Arg      string `json:"arg"`
+			Subtitle string `json:"subtitle"`
+		} `json:"alt"`
+	} `json:"mods"`
 }
 
 func newAlfredItem(title, url, path string) *alfredItem {
 	ai := new(alfredItem)
+	ai.Arg = url
 	ai.Title = title
 	ai.QuickLookURL = path
 	ai.Text.Copy = url
 	ai.Icon.Type = "filepath"
 	ai.Icon.Path = path
+	ai.Mods.Alt.Valid = true
+	ai.Mods.Alt.Arg = fmt.Sprintf("![](%s)", url)
+	ai.Mods.Alt.Subtitle = "markdown"
 
 	return ai
 }
