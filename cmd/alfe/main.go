@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -31,6 +32,10 @@ func main() {
 
 	if *updateFlag {
 		err = runUpdate()
+	}
+
+	if updatedNeeded() {
+		forkUpdate()
 	}
 
 	if *searchFlag {
@@ -59,6 +64,21 @@ func runUpdate() error {
 	fmt.Fprintln(os.Stderr, "updated emoji index")
 
 	return nil
+}
+
+func updatedNeeded() bool {
+	emos, err := newEmos()
+	defer emos.Close()
+	if err != nil {
+		return true
+	}
+	return emos.IsIndexEmpty()
+}
+
+func forkUpdate() {
+	cmd := exec.Command(os.Args[0], "-update")
+	cmd.Stderr = os.Stderr
+	cmd.Start()
 }
 
 func newEmos() (*emos.EmojiSearch, error) {
