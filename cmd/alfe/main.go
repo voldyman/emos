@@ -134,9 +134,9 @@ func runSearch(input string) error {
 	}
 	defer emos.Close()
 
-	result := emos.Search(input)
+	iter := emos.Search(input)
 
-	aiChan := prepareResults(result.Emojis)
+	aiChan := prepareResults(iter)
 
 	alfredResult := alfredResult{Items: []*alfredItem{}}
 
@@ -147,7 +147,7 @@ func runSearch(input string) error {
 	return json.NewEncoder(os.Stdout).Encode(alfredResult)
 }
 
-func prepareResults(emojis []*emos.Emoji) <-chan *alfredItem {
+func prepareResults(iter *emos.SearchResultIter) <-chan *alfredItem {
 	aiChan := make(chan *alfredItem)
 	g, _ := errgroup.WithContext(context.Background())
 
@@ -171,8 +171,10 @@ func prepareResults(emojis []*emos.Emoji) <-chan *alfredItem {
 
 	// send work to pool
 	go func() {
-		for _, emoji := range emojis {
+		emoji, err := iter.Next()
+		for err == nil {
 			workChan <- emoji
+			emoji, err = iter.Next()
 		}
 		close(workChan)
 	}()

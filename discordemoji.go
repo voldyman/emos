@@ -1,4 +1,4 @@
-package emos 
+package emos
 
 import (
 	"encoding/json"
@@ -55,7 +55,7 @@ type apiEmoji struct {
 }
 
 func fetchRawEmojis() ([]apiEmoji, error) {
-	resp, err := http.Get("https://discordemoji.com/api")
+	resp, err := http.Get("https://emoji.gg/api/")
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func fetchRawEmojis() ([]apiEmoji, error) {
 }
 
 func fetchEmojiCategories() (map[string]string, error) {
-	resp, err := http.Get("https://discordemoji.com/api?request=categories")
+	resp, err := http.Get("https://emoji.gg/api/?request=categories")
 	if err != nil {
 		return nil, err
 	}

@@ -24,8 +24,8 @@ func init() {
 
 func main() {
 	text := ""
-	if len(flag.Args()) > 0 {
-		text = strings.Join(os.Args[1:], " ")
+	if flag.NArg() > 0 {
+		text = strings.Join(flag.Args(), " ")
 	}
 
 	if *conigDirFlag {
@@ -33,27 +33,34 @@ func main() {
 		return
 	}
 
-	emos, err := emos.NewEmojiSearch(config.Loc(config.CacheFileName), config.Loc(config.IndexFileName))
+	e, err := emos.NewEmojiSearch(config.Loc(config.CacheFileName), config.Loc(config.IndexFileName))
 	if err != nil {
 		panic(err)
 	}
-	defer emos.Close()
+	defer e.Close()
 
-	if emos.IsIndexEmpty() || *updateFlag {
+	if e.IsIndexEmpty() || *updateFlag {
 		fmt.Println("building index, this will take a minute. you should hydrate. :blobsweat:")
-		emos.RefreshIndex()
+		e.RefreshIndex()
 	}
 
-	result := emos.Search(text)
-	emojis := result.Emojis
+	if text == "" {
+		// nothing to search, so let's not, eh?
+		return
+	}
 
-	if *luckyFlag && len(emojis) > 1 {
-		emojis = emojis[0:1]
+	iter := e.Search(text)
+	emoji, err := iter.Next()
+
+	count := 20
+	if *luckyFlag {
+		count = 1
 	}
 
 	lines := []string{}
-	for _, e := range emojis {
-		lines = append(lines, createPrintStatement(e))
+	for i := 0; i < count && err == nil; i++ {
+		lines = append(lines, createPrintStatement(emoji))
+		emoji, err = iter.Next()
 	}
 
 	if isStdoutPiped() {

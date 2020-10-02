@@ -50,26 +50,35 @@ func (es *EmojiSearch) IsIndexEmpty() bool {
 	return es.index.Count() == 0
 }
 
-type SearchResult struct {
-	Query  string
-	Emojis []*Emoji
+type SearchResultIter struct {
+	Query string
+	es    *EmojiSearch
+	iter  *searchIter
 }
 
-func (es *EmojiSearch) Search(input string) *SearchResult {
-	r, err := es.index.Search(input)
+func (si *SearchResultIter) Next() (*Emoji, error) {
+	docID, err := si.iter.Next()
+	if err != nil {
+		return nil, fmt.Errorf("stop searching: %w", err)
+	}
+
+	if emoji, ok := si.es.store[docID]; ok {
+		return emoji, nil
+	}
+
+	return nil, fmt.Errorf("invalid state, docID: %s not found in store", docID)
+}
+
+func (es *EmojiSearch) Search(input string) *SearchResultIter {
+	iter, err := es.index.Search(input)
 	if err != nil {
 		fmt.Println("unable to search", err)
 		return nil
 	}
-	result := &SearchResult{
-		Query:  input,
-		Emojis: []*Emoji{},
-	}
-
-	for _, id := range r {
-		if e, ok := es.store[id]; ok {
-			result.Emojis = append(result.Emojis, e)
-		}
+	result := &SearchResultIter{
+		Query: input,
+		iter:  iter,
+		es:    es,
 	}
 	return result
 }
