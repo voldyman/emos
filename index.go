@@ -5,10 +5,28 @@ import (
 	"fmt"
 
 	"github.com/blugelabs/bluge"
+	"github.com/blugelabs/bluge/analysis"
+	"github.com/blugelabs/bluge/analysis/token"
+	"github.com/blugelabs/bluge/analysis/tokenizer"
 	"github.com/blugelabs/bluge/search"
 )
 
 const maxBatchSize = 30
+
+const (
+	titleField       = "Title"
+	titleNGField     = "TitleNG"
+	categoryField    = "Category"
+	descriptionField = "Description"
+)
+
+var ngramAnalyzer = &analysis.Analyzer{
+	Tokenizer: tokenizer.NewUnicodeTokenizer(),
+	TokenFilters: []analysis.TokenFilter{
+		token.NewLowerCaseFilter(),
+		token.NewNgramFilter(1, 3),
+	},
+}
 
 type index struct {
 	cfg bluge.Config
@@ -50,9 +68,10 @@ func (i *index) IndexEmoji(id string, e *Emoji) error {
 
 func createDocFromEmoji(id string, e *Emoji) *bluge.Document {
 	return bluge.NewDocument(id).
-		AddField(bluge.NewTextField("Title", e.Title)).
-		AddField(bluge.NewTextField("Description", e.Description)).
-		AddField(bluge.NewTextField("Category", e.Category))
+		AddField(bluge.NewTextField(titleField, e.Title)).
+		AddField(bluge.NewTextField(titleNGField, e.Title).WithAnalyzer(ngramAnalyzer)).
+		AddField(bluge.NewTextField(descriptionField, e.Description)).
+		AddField(bluge.NewTextField(categoryField, e.Category))
 }
 
 func (i *index) IndexEmojiStore(store map[string]*Emoji) error {
@@ -96,20 +115,23 @@ func (i *index) Search(text string) (*searchIter, error) {
 		return nil, fmt.Errorf("unable to open index reader: %w", err)
 	}
 
-	titlePrefixQuery := bluge.NewPrefixQuery(text).SetField("Title")
-	titleRegexQuery := bluge.NewRegexpQuery(".*" + text + ".*")
+	titlePrefixQuery := bluge.NewPrefixQuery(text).SetField(titleField)
 
-	categoryPrefixQuery := bluge.NewPrefixQuery(text).SetField("Category")
-	categoryRegexQuery := bluge.NewRegexpQuery(text).SetField("Category")
+	titleQuery := bluge.NewMatchQuery(text).
+		SetField(titleNGField).
+		SetAnalyzer(ngramAnalyzer)
 
-	descFuzzyQuery := bluge.NewFuzzyQuery(text).SetField("Description")
+	categoryQuery := bluge.NewMatchQuery(text).SetField(categoryField)
+
+	descQuery := bluge.NewMatchQuery(text).SetField(descriptionField)
 
 	query := bluge.NewBooleanQuery().AddShould(
-		titlePrefixQuery, titleRegexQuery,
-		categoryPrefixQuery, categoryRegexQuery,
-		descFuzzyQuery)
+		titlePrefixQuery, titleQuery,
+		categoryQuery,
+		descQuery,
+	)
 
-	req := bluge.NewAllMatches(query)
+	req := bluge.NewTopNSearch(50, query).WithStandardAggregations()
 
 	iter, err := r.Search(context.Background(), req)
 	if err != nil {
