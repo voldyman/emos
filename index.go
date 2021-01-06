@@ -42,13 +42,21 @@ func (c *characterFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 	return out
 }
 
-var titleAnalyzer = &analysis.Analyzer{
+var titleNgramAnalyzer = &analysis.Analyzer{
 	Tokenizer: tokenizer.NewUnicodeTokenizer(),
 	TokenFilters: []analysis.TokenFilter{
 		token.NewCamelCaseFilter(),
 		token.NewLowerCaseFilter(),
 		newCharacterFilter("_"),
 		token.NewNgramFilter(3, 3),
+	},
+}
+
+var textAnalyzer = &analysis.Analyzer{
+	Tokenizer: tokenizer.NewUnicodeTokenizer(),
+	TokenFilters: []analysis.TokenFilter{
+		token.NewCamelCaseFilter(),
+		token.NewLowerCaseFilter(),
 	},
 }
 
@@ -93,9 +101,9 @@ func (i *index) IndexEmoji(id string, e *Emoji) error {
 func createDocFromEmoji(id string, e *Emoji) *bluge.Document {
 	return bluge.NewDocument(id).
 		AddField(bluge.NewTextField(titleField, e.Title)).
-		AddField(bluge.NewTextField(titleNGField, e.Title).WithAnalyzer(titleAnalyzer)).
-		AddField(bluge.NewTextField(descriptionField, e.Description)).
-		AddField(bluge.NewTextField(categoryField, e.Category))
+		AddField(bluge.NewTextField(titleNGField, e.Title).WithAnalyzer(titleNgramAnalyzer)).
+		AddField(bluge.NewTextField(descriptionField, e.Description).WithAnalyzer(textAnalyzer)).
+		AddField(bluge.NewTextField(categoryField, e.Category).WithAnalyzer(textAnalyzer))
 }
 
 func (i *index) IndexEmojiStore(store map[string]*Emoji) error {
@@ -143,11 +151,15 @@ func (i *index) Search(text string) (*searchIter, error) {
 
 	titleQuery := bluge.NewMatchQuery(text).
 		SetField(titleNGField).
-		SetAnalyzer(titleAnalyzer)
+		SetAnalyzer(titleNgramAnalyzer).
+		SetBoost(5)
 
-	categoryQuery := bluge.NewMatchQuery(text).SetField(categoryField)
+	categoryQuery := bluge.NewMatchQuery(text).
+		SetField(categoryField).
+		SetAnalyzer(textAnalyzer)
 
-	descQuery := bluge.NewMatchQuery(text).SetField(descriptionField)
+	descQuery := bluge.NewMatchQuery(text).SetField(descriptionField).
+		SetAnalyzer(textAnalyzer)
 
 	query := bluge.NewBooleanQuery().AddShould(
 		titlePrefixQuery, titleQuery,
