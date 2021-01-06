@@ -20,11 +20,35 @@ const (
 	descriptionField = "Description"
 )
 
-var ngramAnalyzer = &analysis.Analyzer{
+type characterFilter struct {
+	lookupTable map[string]struct{}
+}
+
+func newCharacterFilter(chars ...string) *characterFilter {
+	lookupTable := map[string]struct{}{}
+	for _, ch := range chars {
+		lookupTable[ch] = struct{}{}
+	}
+	return &characterFilter{lookupTable}
+}
+
+func (c *characterFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
+	out := make(analysis.TokenStream, 0, len(input))
+	for _, t := range input {
+		if _, ok := c.lookupTable[string(t.Term)]; !ok {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+var titleAnalyzer = &analysis.Analyzer{
 	Tokenizer: tokenizer.NewUnicodeTokenizer(),
 	TokenFilters: []analysis.TokenFilter{
+		token.NewCamelCaseFilter(),
 		token.NewLowerCaseFilter(),
-		token.NewNgramFilter(1, 3),
+		newCharacterFilter("_"),
+		token.NewNgramFilter(3, 3),
 	},
 }
 
@@ -69,7 +93,7 @@ func (i *index) IndexEmoji(id string, e *Emoji) error {
 func createDocFromEmoji(id string, e *Emoji) *bluge.Document {
 	return bluge.NewDocument(id).
 		AddField(bluge.NewTextField(titleField, e.Title)).
-		AddField(bluge.NewTextField(titleNGField, e.Title).WithAnalyzer(ngramAnalyzer)).
+		AddField(bluge.NewTextField(titleNGField, e.Title).WithAnalyzer(titleAnalyzer)).
 		AddField(bluge.NewTextField(descriptionField, e.Description)).
 		AddField(bluge.NewTextField(categoryField, e.Category))
 }
@@ -119,7 +143,7 @@ func (i *index) Search(text string) (*searchIter, error) {
 
 	titleQuery := bluge.NewMatchQuery(text).
 		SetField(titleNGField).
-		SetAnalyzer(ngramAnalyzer)
+		SetAnalyzer(titleAnalyzer)
 
 	categoryQuery := bluge.NewMatchQuery(text).SetField(categoryField)
 
